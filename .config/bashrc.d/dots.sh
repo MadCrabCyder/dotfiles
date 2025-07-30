@@ -25,7 +25,7 @@ function dots_check_local_status {
 # Check if the local branch is ahead/behind/diverged from upstream
 function dots_check_remote_status {
     # Ensure upstream is configured
-    if ! dots rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+    if ! dots rev-parse --abbrev-ref --symbolic-full-name refs/remotes/origin/master >/dev/null 2>&1; then
         echo "⚠️ No upstream configured for your current dotfiles branch."
         return
     fi
@@ -34,9 +34,9 @@ function dots_check_remote_status {
     dots fetch >/dev/null 2>&1
 
     # Get commit hashes
-    local_local=$(dots rev-parse @)
-    remote_upstream=$(dots rev-parse @{u})
-    base_commit=$(dots merge-base @ @{u})
+    local=$(dots rev-parse refs/heads/master)
+    remote=$(dots rev-parse refs/remotes/origin/master)
+    base=$(dots merge-base refs/heads/master refs/remotes/origin/master)
 
     # Compare and print sync status
     if [ "$local_local" = "$remote_upstream" ]; then
