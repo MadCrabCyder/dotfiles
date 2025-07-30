@@ -39,11 +39,11 @@ function dots_check_remote_status {
     base=$(dots merge-base refs/heads/master refs/remotes/origin/master)
 
     # Compare and print sync status
-    if [ "$local_local" = "$remote_upstream" ]; then
+    if [ "$local" = "$remote" ]; then
         echo "✅ Your dotfiles are up to date with upstream."
-    elif [ "$local_local" = "$base_commit" ]; then
+    elif [ "$local" = "$base" ]; then
         echo "⬇️ Your dotfiles are behind upstream. Run 'dots pull'."
-    elif [ "$remote_upstream" = "$base_commit" ]; then
+    elif [ "$remote" = "$base" ]; then
         echo "⬆️ Your dotfiles are ahead of upstream. Run 'dots push'."
     else
         echo "⚠️ Your dotfiles have diverged from upstream."
