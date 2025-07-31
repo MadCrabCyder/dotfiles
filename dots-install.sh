@@ -43,3 +43,6 @@ dots config branch.master.remote origin
 dots config branch.master.merge refs/remotes/origin/master
 
 echo "✅ Dotfiles installed and tracking origin/master"
+
+echo "🌀 Installing Atuin..."
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/atuinsh/atuin/releases/latest/download/atuin-installer.sh | sh -s -- --no-modify-path

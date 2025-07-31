@@ -1,0 +1,14 @@
+[theme]
+name = "madcrab"
+
+[colors]
+AlertInfo    = "#458588"  # Blue – info boxes
+AlertWarn    = "#d79921"  # Yellow – warnings
+AlertError   = "#cc241d"  # Red – errors
+Annotation   = "#928374"  # Gray – less prominent text
+Base         = "#ffffff"  # Foreground – primary text
+Guidance     = "#689d6a"  # Aqua – tips, hints
+Important    = "#fabd2f"  # Bright yellow – highlights, matches, selected items
+
+
+

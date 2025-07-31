@@ -1,0 +1,83 @@
+# Database location (default is usually fine)
+# db_path = "~/.local/share/atuin/history.db"
+
+# Enable auto-sync to keep history synced across devices
+auto_sync = true
+sync_frequency = "5m"
+
+# Automatically check for updates
+update_check = true
+
+# Atuin sync server address
+sync_address = "https://api.atuin.sh"
+
+# UI behavior
+style = "auto"             # auto selects compact/full based on terminal
+inline_height = 0          # fullscreen mode
+show_preview = true        # show full command previews
+max_preview_height = 4     # limit preview height
+enter_accept = true        # pressing enter runs command immediately
+
+show_tabs = false
+auto_hide_height = 0
+
+# Search behavior
+search_mode = "fuzzy"
+filter_mode = "workspace"
+workspaces = true
+
+# (optional) Configure how Atuin behaves when using up-arrow history
+# filter_mode_shell_up_key_binding = "workspace"
+# search_mode_shell_up_key_binding = "fuzzy"
+
+# Prevent sensitive or noisy commands from being saved
+history_filter = [
+  "^gpg ",
+  "^secretdo",
+]
+
+cwd_filter = [
+  "^/tmp",
+  "^/very/secret/path",
+]
+
+[search]
+filters = [ "global", "host", "session", "workspace", "directory" ]
+
+[theme]
+name = "madcrab"
+
+# Reduce visual noise in the UI if desired
+# prefers_reduced_motion = false
+
+[stats]
+# Consider subcommands like "git commit" vs just "git"
+common_subcommands = [
+  "apt", "cargo", "composer", "dnf", "docker", "git", "go", "ip",
+  "jj", "kubectl", "nix", "nmcli", "npm", "pecl", "pnpm", "podman",
+  "port", "systemctl", "tmux", "yarn",
+]
+
+# Optional: exclude noisy commands from stats
+ignored_commands = [
+  "cd",
+  "ls",
+  "vi"
+]
+
+[keys]
+# Controls how navigation keys behave
+scroll_exits = true
+exit_past_line_start = true
+accept_past_line_end = true
+
+[sync]
+records = true  # enable sync v2 (future default)
+
+[preview]
+strategy = "auto"  # auto = based on command length
+
+[daemon]
+enabled = false  # enable if you want background sync via `atuin daemon`
+# sync_frequency = 300
+# socket_path = "~/.local/share/atuin/atuin.sock"
