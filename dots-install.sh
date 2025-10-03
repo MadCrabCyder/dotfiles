@@ -40,7 +40,7 @@ dots fetch origin "+refs/heads/*:refs/remotes/origin/*"
 dots update-ref refs/heads/master $(dots rev-parse origin/master)
 dots symbolic-ref HEAD refs/heads/master
 dots config branch.master.remote origin
-dots config branch.master.merge refs/remotes/origin/master
+dots config branch.master.merge refs/heads/master
 
 echo "✅ Dotfiles installed and tracking origin/master"
 
