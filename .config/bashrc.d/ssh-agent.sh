@@ -1,75 +1,133 @@
 # Description:
-# This script ensures an SSH agent is available and that all private keys from
-# ~/.ssh (e.g., id_rsa, id_ed25519, id_ecdsa) are loaded automatically.
+# Ensure an SSH agent is available for interactive shells and load common
+# private keys from ~/.ssh into the selected local agent.
 #
 # Behavior:
-# - If SSH agent forwarding is detected (via ssh -A), it uses the forwarded agent.
-# - Otherwise, it tries to reuse a persistent local agent via ~/.ssh/agent.env.
-# - If the agent is missing or stale, a new one is started and saved.
-# - Only private keys (not *.pub) are added, and duplicates are skipped
+# - Reuse an already-working SSH agent from the current environment.
+# - If no live agent is present, try to restore one from ~/.ssh/agent.env.
+# - If the restored agent is stale, start a new local agent and persist it.
+# - Skip local key loading when the shell is running inside an SSH session with
+#   an existing agent.
+# - Stay quiet by default; set SSH_AGENT_VERBOSE=1 to print status messages.
 
-# If SSH agent is already forwarded (via ssh -A), do nothing
-if [[ -n "$SSH_AUTH_SOCK" && "$SSH_AUTH_SOCK" == /tmp/ssh-* ]]; then
-    # Likely an agent-forwarded session (or existing socket)
-    if ssh-add -l >/dev/null 2>&1; then
-        echo "🔐 Using forwarded SSH agent"
-        return
-    fi
-fi
+command -v ssh-agent >/dev/null 2>&1 || return 0
+command -v ssh-add >/dev/null 2>&1 || return 0
+command -v ssh-keygen >/dev/null 2>&1 || return 0
 
-# Fallback: use local ssh-agent environment file
-SSH_ENV="$HOME/.ssh/agent.env"
+SSH_AGENT_ENV_FILE="$HOME/.ssh/agent.env"
 
-start_ssh_agent() {
-    echo "🔑 Starting new ssh-agent..."
-    eval "$(ssh-agent -s)" >/dev/null
-    {
-    printf 'export SSH_AUTH_SOCK=%q\n' "$SSH_AUTH_SOCK"
-    printf 'export SSH_AGENT_PID=%q\n'  "$SSH_AGENT_PID"
-    } > "$SSH_ENV"
-    chmod 600 "$SSH_ENV"
+ssh_agent_log() {
+    [[ -n "${SSH_AGENT_VERBOSE:-}" ]] || return 0
+    printf '%s\n' "$*"
 }
 
+ssh_agent_is_live() {
+    local status
 
-if [ -f "$SSH_ENV" ]; then
-    source "$SSH_ENV" >/dev/null
-    if ! kill -0 "$SSH_AGENT_PID" 2>/dev/null || [ ! -S "$SSH_AUTH_SOCK" ]; then
-        start_ssh_agent
-    else 
-        echo "🔑 ssh-agent already running"
-    fi
-else
-    start_ssh_agent
-fi
+    [[ -n "${SSH_AUTH_SOCK:-}" && -S "${SSH_AUTH_SOCK:-}" ]] || return 1
 
-export SSH_AUTH_SOCK SSH_AGENT_PID
+    command ssh-add -l >/dev/null 2>&1
+    status=$?
 
+    [[ $status -eq 0 || $status -eq 1 ]]
+}
 
-# Only if agent is up and socket exists
-if [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
-  shopt -s nullglob
-  for key in "$HOME/.ssh"/id_{rsa,ed25519,ecdsa}*; do
-    
-    # Skip if the file is a public key or not a regular file
-    [[ "$key" == *.pub || ! -f "$key" ]] && continue
+ssh_agent_write_env() {
+    mkdir -p "$HOME/.ssh"
+    {
+        printf 'export SSH_AUTH_SOCK=%q\n' "$SSH_AUTH_SOCK"
+        printf 'export SSH_AGENT_PID=%q\n' "${SSH_AGENT_PID:-}"
+    } > "$SSH_AGENT_ENV_FILE"
+    chmod 600 "$SSH_AGENT_ENV_FILE"
+}
 
-    # Get the fingerprint of the private key using ssh-keygen
-    # This uniquely identifies the key regardless of filename or comment    
-    fp=$(ssh-keygen -lf "$key" 2>/dev/null | awk '{print $2}') || continue
+ssh_agent_start() {
+    ssh_agent_log "Starting local ssh-agent"
+    eval "$(command ssh-agent -s)" >/dev/null
+    ssh_agent_write_env
+    export SSH_AUTH_SOCK SSH_AGENT_PID
+}
 
-    # Check if the fingerprint is already listed in the ssh-agent
-    if ! ssh-add -l 2>/dev/null | awk '{print $2}' | grep -qx "$fp"; then
+ssh_agent_restore() {
+    [[ -f "$SSH_AGENT_ENV_FILE" ]] || return 1
 
-        # Key is not loaded, attempt to add it to the agent
-        if ssh-add "$key" > /dev/null 2>&1; then
-            echo "✅ Added key: $key"
-        else
-            echo "❌ Failed to add key: $key"
+    # shellcheck disable=SC1090
+    source "$SSH_AGENT_ENV_FILE" >/dev/null
+    export SSH_AUTH_SOCK SSH_AGENT_PID
+
+    ssh_agent_is_live
+}
+
+ssh_agent_loaded_fingerprints() {
+    local output
+    local status
+
+    output="$(command ssh-add -l 2>/dev/null)"
+    status=$?
+
+    case $status in
+        0)
+            awk 'NF >= 2 { print $2 }' <<< "$output"
+            ;;
+        1)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+ssh_agent_load_keys() {
+    local had_nullglob=0
+    local key
+    local fingerprint
+    local loaded_fingerprints
+
+    ssh_agent_is_live || return 0
+
+    loaded_fingerprints="$(ssh_agent_loaded_fingerprints || true)"
+
+    shopt -q nullglob && had_nullglob=1
+    shopt -s nullglob
+
+    for key in "$HOME/.ssh"/id_{rsa,ed25519,ecdsa}{,_*}; do
+        [[ -f "$key" ]] || continue
+        [[ "$key" == *.pub || "$key" == *-cert.pub ]] && continue
+
+        fingerprint="$(command ssh-keygen -lf "$key" 2>/dev/null | awk 'NF >= 2 { print $2 }')" || continue
+        [[ -n "$fingerprint" ]] || continue
+
+        if grep -qxF "$fingerprint" <<< "$loaded_fingerprints"; then
+            continue
         fi
-    else
-        # Fingerprint found: key is already loaded
-        echo "🔒 Key already loaded: $key"
+
+        if command ssh-add "$key" >/dev/null 2>&1; then
+            ssh_agent_log "Added SSH key: $key"
+            loaded_fingerprints+="${loaded_fingerprints:+$'\n'}$fingerprint"
+        else
+            printf 'ssh-agent: failed to add key %s\n' "$key" >&2
+        fi
+    done
+
+    if (( ! had_nullglob )); then
+        shopt -u nullglob
     fi
-  done
-  shopt -u nullglob
+}
+
+if ssh_agent_is_live; then
+    export SSH_AUTH_SOCK SSH_AGENT_PID
+
+    if [[ -n "${SSH_CONNECTION:-}" ]]; then
+        ssh_agent_log "Using existing SSH agent from SSH session"
+        return 0
+    fi
+
+    ssh_agent_log "Using existing SSH agent"
+elif ssh_agent_restore; then
+    ssh_agent_log "Reusing persisted local ssh-agent"
+else
+    ssh_agent_start
 fi
+
+ssh_agent_load_keys
