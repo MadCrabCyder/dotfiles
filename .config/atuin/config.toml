@@ -25,6 +25,7 @@ auto_hide_height = 0
 search_mode = "fuzzy"
 filter_mode = "workspace"
 workspaces = true
+command_chaining = true
 
 # (optional) Configure how Atuin behaves when using up-arrow history
 # filter_mode_shell_up_key_binding = "workspace"
@@ -42,7 +43,7 @@ cwd_filter = [
 ]
 
 [search]
-filters = [ "global", "host", "session", "workspace", "directory" ]
+filters = [ "workspace", "directory", "global" ]
 
 [theme]
 name = "madcrab"
@@ -51,6 +52,10 @@ name = "madcrab"
 # prefers_reduced_motion = false
 
 [stats]
+common_prefix = [
+  "sudo",
+]
+
 # Consider subcommands like "git commit" vs just "git"
 common_subcommands = [
   "apt", "cargo", "composer", "dnf", "docker", "git", "go", "ip",
@@ -68,8 +73,9 @@ ignored_commands = [
 [keys]
 # Controls how navigation keys behave
 scroll_exits = true
-exit_past_line_start = true
+exit_past_line_start = false
 accept_past_line_end = true
+accept_past_line_start = true
 
 [sync]
 records = true  # enable sync v2 (future default)
